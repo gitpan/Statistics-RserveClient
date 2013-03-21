@@ -14,7 +14,7 @@
 
 package Statistics::RserveClient::Connection;
 
-#use Statistics::RserveClient;
+use Statistics::RserveClient;
 
 use Data::Dumper;
 
@@ -93,7 +93,7 @@ use constant ERR_detach_failed   => 0x51;
 
 use Config;
 
-my $_initialized = Statistics::RserveClient::FALSE;    #class variable
+my $_initialized = FALSE;    #class variable
 
 # get/setter for class variable
 sub initialized(@) {
@@ -101,7 +101,7 @@ sub initialized(@) {
     return $_initialized;
 }
 
-my $_machine_is_bigendian = Statistics::RserveClient::FALSE;
+my $_machine_is_bigendian = FALSE;
 # get/setter for class variable
 sub machine_is_bigendian(;$) {
     $_machine_is_bigendian = shift if @_;
@@ -123,12 +123,12 @@ sub init {
     Statistics::RserveClient::debug( "setting byte order...\n" );
 
     if ( $Config{byteorder} eq '87654321' ) {
-        machine_is_bigendian(Statistics::RserveClient::TRUE);
+        machine_is_bigendian(TRUE);
     }
     else {
-        machine_is_bigendian(Statistics::RserveClient::FALSE);
+        machine_is_bigendian(FALSE);
     }
-    initialized(Statistics::RserveClient::TRUE);
+    initialized(TRUE);
 
     Statistics::RserveClient::debug( "set initialized to true...\n" );
     return $self;
@@ -147,7 +147,7 @@ sub new {
     my $class = shift;
     my $self  = {
         socket       => undef,
-        auth_request => Statistics::RserveClient::FALSE,
+        auth_request => FALSE,
         auth_method  => undef,
         auth_key     => undef,
     };
@@ -156,7 +156,7 @@ sub new {
 
     my $host  = '127.0.0.1';
     my $port  = 6311;
-    my $debug = Statistics::RserveClient::FALSE;
+    my $debug = FALSE;
 
     if ( @_ == 3 ) {
 	Statistics::RserveClient::debug "3 args to Statistics::RserveClient::Connection::new()\n";
@@ -208,12 +208,7 @@ sub new {
         }
     };
     if ($@) {
-        die(Statistics::RserveClient::Exception->new(
-                      "Unable to create socket<pre>"
-                    . $@->getErrorMessage()
-                    . "</pre>"
-            )
-        );
+        die "Unable to create socket: $@";
     }
 
     Statistics::RserveClient::debug( "created socket...\n" );
@@ -225,8 +220,7 @@ sub new {
 
     eval { connect( $self->{socket}, $paddr ); };
     if ($@) {
-        die Statistics::RserveClient::Exception->new(
-            "Unable to connect" . $@->getErrorMessage() );
+        die "Unable to connect:$@";
     }
 
     Statistics::RserveClient::debug( "connected...\n" );
@@ -238,50 +232,51 @@ sub new {
     #   [12] ... (additional quad attributes; /r/n and - are ignored)
     my $buf = '';
     eval {
-        (          defined( recv( $self->{socket}, $buf, 32, 0 ) )
-                && length($buf) >= 32
-                && substr( $buf, 0, 4 ) eq 'Rsrv' )
-            or die Statistics::RserveClient::Exception->new(
-            "Invalid response from server:" . $@ . "\n" );
+        ( defined( recv( $self->{socket}, $buf, 32, 0 ) )
+              && length($buf) >= 32
+              && substr( $buf, 0, 4 ) eq 'Rsrv' )
+	or die "Invalid response from server: $@";
     };
     if ($@) {
-        warn $@->getErrorMessage();
+        warn $@;
+	return;
     }
+    else {
+        # @TODO: need to be less specific here
+        my $rv = substr( $buf, 4, 4 );
+        if ( $rv ne '0103' ) {
+           die Statistics::RserveClient::Exception->new('Unsupported protocol version.');
+        }
 
-    # @TODO: need to be less specific here
-    my $rv = substr( $buf, 4, 4 );
-    if ( $rv ne '0103' ) {
-        die Statistics::RserveClient::Exception->new('Unsupported protocol version.');
+        # Parse attributes.  From the Rserve documentation
+        #  "R151" - version of R (here 1.5.1)
+        #  "ARpt" - authorization required (here "pt"=plain text, "uc"=unix crypt)
+        #           connection will be closed if the first packet is not CMD_login.
+        #           If more AR.. methods are specified, then client is free to
+        #           use the one he supports (usually the most secure)
+        #  "K***" - key if encoded authentification is challenged (*** is the key)
+        #           for Unix crypt the first two letters of the key are the salt
+        #           required by the server */
+
+        # Grab connection attributes (each is a quad)
+        for ( my $i = 12; $i < 32; $i += 4 ) {
+            my $attr = substr( $buf, $i, 4 );
+    
+            Statistics::RserveClient::debug( "attr = $attr\n" );
+            if ( $attr eq 'ARpt' ) {
+                $self->{auth_request} = TRUE;
+                $self->{auth_method}  = 'plain';
+            }
+            elsif ( $attr eq 'ARuc' ) {
+                $self->{auth_request} = TRUE;
+                $self->{auth_method}  = 'crypt';
+            }
+            if ( substr( $attr, 0, 1 ) eq 'K' ) {
+                $self->{auth_key} = substr( $attr, 1, 3 );
+            }
+        }
+        return $self;
     }
-
-    # Parse attributes.  From the Rserve documentation
-    #  "R151" - version of R (here 1.5.1)
-    #  "ARpt" - authorization required (here "pt"=plain text, "uc"=unix crypt)
-    #           connection will be closed if the first packet is not CMD_login.
-    #           If more AR.. methods are specified, then client is free to
-    #           use the one he supports (usually the most secure)
-    #  "K***" - key if encoded authentification is challenged (*** is the key)
-    #           for Unix crypt the first two letters of the key are the salt
-    #           required by the server */
-
-    # Grab connection attributes (each is a quad)
-    for ( my $i = 12; $i < 32; $i += 4 ) {
-        my $attr = substr( $buf, $i, 4 );
-
-        Statistics::RserveClient::debug( "attr = $attr\n" );
-        if ( $attr eq 'ARpt' ) {
-            $self->{auth_request} = Statistics::RserveClient::TRUE;
-            $self->{auth_method}  = 'plain';
-        }
-        elsif ( $attr eq 'ARuc' ) {
-            $self->{auth_request} = Statistics::RserveClient::TRUE;
-            $self->{auth_method}  = 'crypt';
-        }
-        if ( substr( $attr, 0, 1 ) eq 'K' ) {
-            $self->{auth_key} = substr( $attr, 1, 3 );
-        }
-    }
-    return $self;
 }
 
 sub DESTROY() {
@@ -315,7 +310,7 @@ sub evalString() {
     }
 
     Statistics::RserveClient::debug( "parser = $parser\n" );
-    Statistics::RserveClient::debug( "attr = @attr\n" );
+    Statistics::RserveClient::debug( "attr = %attr\n" );
     Statistics::RserveClient::debug( "string = $string\n" );
 
     my %r = $self->command( Statistics::RserveClient::Connection::CMD_eval, $string );
@@ -345,12 +340,11 @@ sub evalString() {
 	}
 	elsif ($parser == PARSER_NATIVE_WRAPPED) {
 	    my $old = Statistics::RserveClient::Parser->use_array_object();
-	    Statistics::RserveClient::Parser->use_array_object(Statistics::RserveClient::TRUE);
+	    Statistics::RserveClient::Parser->use_array_object(TRUE);
 	    @res = Statistics::RserveClient::Parser->parse( $buf, $i, %attr );
 	    Statistics::RserveClient::Parser->use_array_object($old);
 	}
 	else {
-	    die( new Statistics::RserveClient::Exception('Unknown parser') );
 	    die('Unknown parser');
 	}
 	return @res;
@@ -425,7 +419,7 @@ sub close_connection() {
     if ( $self->{socket} ) {
         return CORE::close($self->{socket});
     }
-    return Statistics::RserveClient::TRUE;
+    return TRUE;
 }
 
 #
@@ -454,8 +448,8 @@ sub command() {
             if ( $n == 0 );
     };
     if ($@) {
-        warn "Error on " . $self->{socket} . ":" . $@->getErrorMessage() . "\n";
-        return Statistics::RserveClient::FALSE;
+        warn "Error on " . $self->{socket} . ":" . $@ . "\n";
+        return FALSE;
     }
 
     #Statistics::RserveClient::debug "sent pkt..\n";
@@ -490,12 +484,13 @@ sub commandRaw() {
         #socket_send($self->{socket}, $pkt, length($pkt), 0);
         my $n = send( $self->{socket}, $pkt, 0 );
         #Statistics::RserveClient::debug "n = $n\n";
-        die Statistics::RserveClient::Exception->new("Invalid (short) response from server:$!")
-            if ( $n == 0 );
-    };
+	if ( $n == 0 ) {
+	  die "Invalid (short) response from server:$! \n";
+	};
+      };
     if ($@) {
-        warn "Error: on " . $self->{socket} . ":" . $@->getErrorMessage() . "\n";
-        return Statistics::RserveClient::FALSE;
+        warn "Error: on " . $self->{socket} . ":" . $@ . "\n";
+        return FALSE;
     }
 
     #Statistics::RserveClient::debug "sent pkt..\n";
@@ -512,13 +507,13 @@ sub processResponse($) {
         #Statistics::RserveClient::debug "receiving pkt..\n";
         ( defined( recv( $self->{socket}, $buf, 16, 0 ) )
                 && length($buf) >= 16 )
-            or die Statistics::RserveClient::Exception->new(
-            'Invalid (short) response from server:');
+            or die Statistics::RserveClient::Exception->new( 
+	      'Invalid (short) response from server:');
         $n = length($buf);
         #Statistics::RserveClient::debug "n = $n\n";
     };
     if ($@) {
-        warn $@->getErrorMessage();
+        warn $@;
     }
 
     # Statistics::RserveClient::debug "got response...$buf\n";
@@ -528,7 +523,7 @@ sub processResponse($) {
     #foreach (@b) {print "[" . ord($_) . "]" }; print "\n";
 
     if ( $n != 16 ) {
-        return Statistics::RserveClient::FALSE;
+        return FALSE;
     }
 
     my $code = Statistics::RserveClient::Funclib::int32( \@b, 0 );
@@ -551,7 +546,7 @@ sub processResponse($) {
             # Statistics::RserveClient::debug "  n = $n\n";
         };
         if ($@) {
-            warn $@->getErrorMessage();
+            warn $@;
         }
 
         #Statistics::RserveClient::debug "buf = $buf\n";
@@ -579,7 +574,7 @@ sub processResponse($) {
 
     my %r = (
         code       => $code,
-        is_error   => ( ( $code & 15 ) != 1 ) ? Statistics::RserveClient::TRUE : Statistics::RserveClient::FALSE,
+        is_error   => ( ( $code & 15 ) != 1 ) ? TRUE : FALSE,
         'error'    => ( $code >> 24 ) & 127,
         'contents' => $buf
     );
