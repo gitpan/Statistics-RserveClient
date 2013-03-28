@@ -20,6 +20,8 @@
 
 package Statistics::RserveClient::REXP::Unknown;
 
+our $VERSION = '0.06'; #VERSION
+
 sub new($) {
     my $class = shift;
     my $type  = shift;

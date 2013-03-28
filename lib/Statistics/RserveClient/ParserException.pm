@@ -13,6 +13,8 @@
 
 package Statistics::RserveClient::ParserException;
 
+our $VERSION = '0.06'; #VERSION
+
 use Statistics::RserveClient::Exception;
 
 use Exporter;
