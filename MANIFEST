@@ -29,7 +29,7 @@ lib/Statistics/RserveClient/REXP/Unknown.pm
 lib/Statistics/RserveClient/REXP/Vector.pm
 lib/Statistics/RserveClient/REXP.pm
 lib/Statistics/RserveClient/RNative.pm
-lib/Statistics/RserveClient/VERSION
+lib/Statistics/RserveClient/VERSION.pm
 lib/Statistics/RserveClient/test_funclib.pl
 lib/Statistics/RserveClient.pm
 t/001_load.t
