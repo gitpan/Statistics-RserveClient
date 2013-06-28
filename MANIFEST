@@ -1,13 +1,5 @@
 Changes
 Documentation
-LICENSE
-MANIFEST
-Makefile.PL
-README
-README.md
-Rshell
-Todo
-VERSION
 lib/Statistics/RserveClient/Connection.pm
 lib/Statistics/RserveClient/Exception.pm
 lib/Statistics/RserveClient/Funclib.pm
@@ -31,6 +23,11 @@ lib/Statistics/RserveClient/REXP.pm
 lib/Statistics/RserveClient/RNative.pm
 lib/Statistics/RserveClient/test_funclib.pl
 lib/Statistics/RserveClient.pm
+LICENSE
+MANIFEST
+README
+README.md
+Rshell
 t/001_load.t
 t/002_connect.t
 t/REXP/testDouble.t
@@ -42,8 +39,8 @@ t/REXP/testLanguage.t
 t/REXP/testList.t
 t/REXP/testLogical.t
 t/REXP/testNull.t
-t/REXP/testREXP.t
 t/REXP/testRaw.t
+t/REXP/testREXP.t
 t/REXP/testString.t
 t/REXP/testSymbol.t
 t/REXP/testUnknown.t
@@ -53,7 +50,9 @@ t/Rserve/testConnection.t
 t/Rserve/testEvalDataTypes.t
 t/Rserve/testEvalLists.t
 test.pl
-tests/ParserNativeTest.php
 tests/config.pl
+tests/ParserNativeTest.php
 tests/test.binary.php
 tests/test_binary.pl
+Todo
+VERSION
